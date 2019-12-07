@@ -1,8 +1,8 @@
 // https://rosettacode.org/wiki/Permutations#Iterative
-pub fn permutations(size: usize) -> Permutations {
+pub fn permutations(low: usize, high: usize) -> Permutations {
     Permutations {
-        idxs: (0..size).collect(),
-        swaps: vec![0; size],
+        idxs: (low..high).collect(),
+        swaps: vec![0; high - low],
         i: 0,
     }
 }
