@@ -4,7 +4,7 @@ use std::fs;
 type Orbits<'a> = HashMap<&'a str, &'a str>;
 
 fn parse_orbits(input: &str) -> Orbits {
-    let mut orbits: Orbits = HashMap::new();
+    let mut orbits = Orbits::new();
 
     for line in input.lines() {
         let centre = &line[..3];
