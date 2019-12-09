@@ -2,10 +2,11 @@ fn divmod(value: isize, quotient: isize) -> (isize, isize) {
     (value / quotient, value % quotient)
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum Var {
     Immediate(isize),
     Positional(usize),
+    Relative(isize),
 }
 
 impl Var {
@@ -19,6 +20,7 @@ impl Var {
             out.push(match kind {
                 0 => Var::Positional(*i as usize),
                 1 => Var::Immediate(*i),
+                2 => Var::Relative(*i),
                 _ => panic!("unexpected type {}", kind),
             })
         }
@@ -26,6 +28,7 @@ impl Var {
     }
 }
 
+#[derive(Debug)]
 enum Op {
     Add(Var, Var, Var),      // 1
     Multiply(Var, Var, Var), // 2
@@ -35,18 +38,20 @@ enum Op {
     JumpIfFalse(Var, Var),   // 6
     LessThan(Var, Var, Var), // 7
     Equal(Var, Var, Var),    // 8
+    AdjustOffset(Var),       // 9
     Halt,                    // 99
 }
 
-enum Interupt {
+pub enum Interupt {
     Halt,
     Input(InputState),
     Output(OutputState),
 }
 
-struct Program {
+pub struct Program {
     memory: Vec<isize>,
     pointer: usize,
+    offset: usize,
 }
 
 impl Program {
@@ -54,6 +59,7 @@ impl Program {
         Program {
             memory: input,
             pointer: 0,
+            offset: 0,
         }
     }
 
@@ -109,46 +115,68 @@ impl Program {
                     *vars.get(2).unwrap(),
                 )
             }
+            9 => Op::AdjustOffset(
+                *Var::parse(&self.memory[self.pointer + 1..self.pointer + 2], mask)
+                    .get(0)
+                    .unwrap(),
+            ),
             99 => Op::Halt,
             _ => panic!("got unexpected op code {}", op),
         }
     }
 
-    fn get_var(&self, var: Var) -> isize {
-        match var {
-            Var::Immediate(value) => value,
-            Var::Positional(position) => *self.memory.get(position).unwrap(),
+    fn get(&mut self, inx: usize) -> isize {
+        if inx >= self.memory.len() {
+            0
+        } else {
+            *self.memory.get(inx).unwrap()
         }
     }
 
-    fn execute(mut self) -> Interupt {
+    fn set(&mut self, inx: usize, value: isize) {
+        if inx >= self.memory.len() {
+            self.memory.resize(inx + 1, 0);
+        }
+        self.memory[inx] = value;
+    }
+
+    fn get_var(&mut self, var: Var) -> isize {
+        match var {
+            Var::Immediate(value) => value,
+            Var::Positional(position) => self.get(position),
+            Var::Relative(distance) => self.get((self.offset as isize + distance) as usize),
+        }
+    }
+
+    pub fn execute(mut self) -> Interupt {
         loop {
             match self.current() {
-                Op::Add(left, right, out) => {
+                Op::Add(left, right, Var::Positional(out)) => {
+                    //let out = self.get_var(out) as usize;
+                    let value = self.get_var(left) + self.get_var(right);
+                    self.set(out, value);
                     self.pointer += 4;
-                    let out = self.get_var(out) as usize;
-                    self.memory[out] = self.get_var(left) + self.get_var(right);
                 }
-                Op::Multiply(left, right, out) => {
+                Op::Multiply(left, right, Var::Positional(out)) => {
+                    //let out = self.get_var(out) as usize;
+                    let value = self.get_var(left) * self.get_var(right);
+                    self.set(out, value);
                     self.pointer += 4;
-                    let out = self.get_var(out) as usize;
-                    self.memory[out] = self.get_var(left) * self.get_var(right);
                 }
-                Op::Input(position) => {
+                Op::Input(Var::Positional(position)) => {
+                    //let out = self.get_var(position) as usize;
                     self.pointer += 2;
                     return Interupt::Input(InputState {
                         program: self,
-                        position: match position {
-                            Var::Positional(position) => position,
-                            Var::Immediate(_) => panic!("expected positional var for input"),
-                        },
+                        position: position,
                     });
                 }
                 Op::Output(value) => {
+                    let out = self.get_var(value);
                     self.pointer += 2;
                     return Interupt::Output(OutputState {
                         program: self,
-                        value: value,
+                        value: out,
                     });
                 }
                 Op::JumpIfTrue(value, position) => {
@@ -165,25 +193,33 @@ impl Program {
                         self.pointer += 3;
                     }
                 }
-                Op::LessThan(left, right, out) => {
-                    self.pointer += 4;
-                    let out = self.get_var(out) as usize;
-                    self.memory[out] = if self.get_var(left) < self.get_var(right) {
+                Op::LessThan(left, right, Var::Positional(out)) => {
+                    //let out = self.get_var(out) as usize;
+                    let value = if self.get_var(left) < self.get_var(right) {
                         1
                     } else {
                         0
                     };
+                    self.set(out, value);
+                    self.pointer += 4;
                 }
-                Op::Equal(left, right, out) => {
-                    self.pointer += 4;
-                    let out = self.get_var(out) as usize;
-                    self.memory[out] = if self.get_var(left) == self.get_var(right) {
+                Op::Equal(left, right, Var::Positional(out)) => {
+                    //let out = self.get_var(out) as usize;
+                    let value = if self.get_var(left) == self.get_var(right) {
                         1
                     } else {
                         0
                     };
+                    self.set(out, value);
+                    self.pointer += 4;
+                }
+                Op::AdjustOffset(distance) => {
+                    let dist = self.get_var(distance);
+                    self.offset = (self.offset as isize + dist) as usize;
+                    self.pointer += 2;
                 }
                 Op::Halt => return Interupt::Halt,
+                _ => panic!("unexpected op code"),
             }
         }
     }
@@ -201,37 +237,87 @@ impl From<String> for Program {
     }
 }
 
-struct InputState {
+pub struct InputState {
     program: Program,
     position: usize,
 }
 
 impl InputState {
-    fn input(mut self, value: isize) -> Program {
-        self.program.memory[self.position] = value;
+    pub fn input(mut self, value: isize) -> Program {
+        self.program.set(self.position, value);
         self.program
     }
 }
 
-struct OutputState {
+pub struct OutputState {
     program: Program,
-    value: Var,
+    value: isize,
 }
 
 impl OutputState {
-    fn receive(self) -> (Program, isize) {
-        let value = match self.value {
-            Var::Immediate(value) => value,
-            Var::Positional(pos) => *self.program.memory.get(pos).unwrap(),
-        };
-        (self.program, value)
+    pub fn receive(self) -> (Program, isize) {
+        (self.program, self.value)
     }
 }
 
 #[cfg(test)]
 mod tests {
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn test_output_16digit_number() {
+        use super::{Interupt, Program};
+
+        let program = Program::new(vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0]);
+
+        let result = match program.execute() {
+            Interupt::Output(output) => output,
+            _ => panic!("got unexpected interupt"),
+        };
+        let (program, value) = result.receive();
+        println!("{:?}", program.memory);
+        match program.execute() {
+            Interupt::Halt => (),
+            _ => panic!("got unexpected interupt"),
+        };
+
+        assert_eq!(value.to_string().len(), 16);
+    }
+
+    #[test]
+    fn test_large_number() {
+        use super::{Interupt, Program};
+
+        let program = Program::new(vec![104, 1125899906842624, 99]);
+        let result = match program.execute() {
+            Interupt::Output(output) => output,
+            _ => panic!("got unexpected interupt"),
+        };
+        let (program, value) = result.receive();
+        match program.execute() {
+            Interupt::Halt => (),
+            _ => panic!("got unexpected interupt"),
+        };
+
+        assert_eq!(value, 1125899906842624);
+    }
+
+    #[test]
+    fn test_quine() {
+        use super::{Interupt, Program};
+
+        let raw = vec![
+            109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
+        ];
+        let mut outputs = Vec::new();
+
+        let mut program = Program::new(raw.clone());
+
+        while let Interupt::Output(output) = program.execute() {
+            let (prog, value) = output.receive();
+            outputs.push(value);
+            program = prog;
+        }
+
+        assert_eq!(outputs, raw);
     }
 }
