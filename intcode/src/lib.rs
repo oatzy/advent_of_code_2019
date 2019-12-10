@@ -48,6 +48,7 @@ pub enum Interupt {
     Output(OutputState),
 }
 
+#[derive(Clone)]
 pub struct Program {
     memory: Vec<isize>,
     pointer: usize,
@@ -83,9 +84,11 @@ impl Program {
                     *vars.get(2).unwrap(),
                 )
             }
-            3 => Op::Input(Var::Positional(
-                *self.memory.get(self.pointer + 1).unwrap() as usize
-            )),
+            3 => Op::Input(
+                *Var::parse(&self.memory[self.pointer + 1..self.pointer + 2], mask)
+                    .get(0)
+                    .unwrap(),
+            ),
             4 => Op::Output(
                 *Var::parse(&self.memory[self.pointer + 1..self.pointer + 2], mask)
                     .get(0)
@@ -148,27 +151,35 @@ impl Program {
         }
     }
 
+    fn get_out_var(&mut self, var: Var) -> usize {
+        match var {
+            Var::Immediate(_) => panic!("immediate can't be an output"),
+            Var::Positional(position) => position,
+            Var::Relative(distance) => (self.offset as isize + distance) as usize,
+        }
+    }
+
     pub fn execute(mut self) -> Interupt {
         loop {
             match self.current() {
-                Op::Add(left, right, Var::Positional(out)) => {
-                    //let out = self.get_var(out) as usize;
+                Op::Add(left, right, out) => {
+                    let out = self.get_out_var(out);
                     let value = self.get_var(left) + self.get_var(right);
                     self.set(out, value);
                     self.pointer += 4;
                 }
-                Op::Multiply(left, right, Var::Positional(out)) => {
-                    //let out = self.get_var(out) as usize;
+                Op::Multiply(left, right, out) => {
+                    let out = self.get_out_var(out);
                     let value = self.get_var(left) * self.get_var(right);
                     self.set(out, value);
                     self.pointer += 4;
                 }
-                Op::Input(Var::Positional(position)) => {
-                    //let out = self.get_var(position) as usize;
+                Op::Input(position) => {
+                    let out = self.get_out_var(position);
                     self.pointer += 2;
                     return Interupt::Input(InputState {
                         program: self,
-                        position: position,
+                        position: out,
                     });
                 }
                 Op::Output(value) => {
@@ -193,8 +204,8 @@ impl Program {
                         self.pointer += 3;
                     }
                 }
-                Op::LessThan(left, right, Var::Positional(out)) => {
-                    //let out = self.get_var(out) as usize;
+                Op::LessThan(left, right, out) => {
+                    let out = self.get_out_var(out);
                     let value = if self.get_var(left) < self.get_var(right) {
                         1
                     } else {
@@ -203,8 +214,8 @@ impl Program {
                     self.set(out, value);
                     self.pointer += 4;
                 }
-                Op::Equal(left, right, Var::Positional(out)) => {
-                    //let out = self.get_var(out) as usize;
+                Op::Equal(left, right, out) => {
+                    let out = self.get_out_var(out);
                     let value = if self.get_var(left) == self.get_var(right) {
                         1
                     } else {
@@ -219,7 +230,6 @@ impl Program {
                     self.pointer += 2;
                 }
                 Op::Halt => return Interupt::Halt,
-                _ => panic!("unexpected op code"),
             }
         }
     }
