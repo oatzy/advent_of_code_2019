@@ -270,63 +270,89 @@ impl OutputState {
     }
 }
 
+pub struct Computer {
+    program: Option<Program>,
+}
+
+impl Computer {
+    pub fn new(program: Program) -> Self {
+        Computer {
+            program: Some(program),
+        }
+    }
+
+    pub fn input(&mut self, value: isize) -> Result<(), ()> {
+        let program = self.program.take();
+        let input = match program.unwrap().execute() {
+            Interupt::Input(input) => input,
+            _ => return Err(()),
+        };
+        self.program = Some(input.input(value));
+        Ok(())
+    }
+
+    pub fn output(&mut self) -> Option<isize> {
+        let program = self.program.take();
+        match program.unwrap().execute() {
+            Interupt::Output(output) => {
+                let (program, value) = output.receive();
+                self.program = Some(program);
+                Some(value)
+            }
+            Interupt::Halt => None,
+            Interupt::Input(_) => panic!("got input state"),
+        }
+    }
+}
+
+impl Iterator for Computer {
+    type Item = isize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.output()
+    }
+}
+
+impl From<Vec<isize>> for Computer {
+    fn from(raw: Vec<isize>) -> Self {
+        Computer{
+            program: Some(Program::new(raw))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     #[test]
     fn test_output_16digit_number() {
-        use super::{Interupt, Program};
+        use super::Computer;
 
-        let program = Program::new(vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0]);
+        let mut computer = Computer::from(vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0]);
 
-        let result = match program.execute() {
-            Interupt::Output(output) => output,
-            _ => panic!("got unexpected interupt"),
-        };
-        let (program, value) = result.receive();
-        println!("{:?}", program.memory);
-        match program.execute() {
-            Interupt::Halt => (),
-            _ => panic!("got unexpected interupt"),
-        };
-
-        assert_eq!(value.to_string().len(), 16);
+        assert_eq!(computer.output().unwrap().to_string().len(), 16);
+        assert_eq!(computer.output(), None);
     }
 
     #[test]
     fn test_large_number() {
-        use super::{Interupt, Program};
+        use super::Computer;
 
-        let program = Program::new(vec![104, 1125899906842624, 99]);
-        let result = match program.execute() {
-            Interupt::Output(output) => output,
-            _ => panic!("got unexpected interupt"),
-        };
-        let (program, value) = result.receive();
-        match program.execute() {
-            Interupt::Halt => (),
-            _ => panic!("got unexpected interupt"),
-        };
+        let mut computer = Computer::from(vec![104, 1125899906842624, 99]);
 
-        assert_eq!(value, 1125899906842624);
+        assert_eq!(computer.output().unwrap(), 1125899906842624);
+        assert_eq!(computer.output(), None);
     }
 
     #[test]
     fn test_quine() {
-        use super::{Interupt, Program};
+        use super::Computer;
 
         let raw = vec![
             109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
         ];
-        let mut outputs = Vec::new();
 
-        let mut program = Program::new(raw.clone());
-
-        while let Interupt::Output(output) = program.execute() {
-            let (prog, value) = output.receive();
-            outputs.push(value);
-            program = prog;
-        }
+        let outputs: Vec<isize> = Computer::from(raw.clone()).collect();
 
         assert_eq!(outputs, raw);
     }
