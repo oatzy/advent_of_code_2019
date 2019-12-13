@@ -136,7 +136,7 @@ impl Program {
         }
     }
 
-    fn set(&mut self, inx: usize, value: isize) {
+    pub fn set(&mut self, inx: usize, value: isize) {
         if inx >= self.memory.len() {
             self.memory.resize(inx + 1, 0);
         }
@@ -315,8 +315,8 @@ impl Iterator for Computer {
 
 impl From<Vec<isize>> for Computer {
     fn from(raw: Vec<isize>) -> Self {
-        Computer{
-            program: Some(Program::new(raw))
+        Computer {
+            program: Some(Program::new(raw)),
         }
     }
 }
