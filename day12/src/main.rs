@@ -2,7 +2,7 @@ extern crate regex;
 
 use regex::Regex;
 use std::cmp::Ordering;
-use std::fmt::Debug;
+use std::fmt;
 use std::fs;
 use std::ops::Add;
 
@@ -14,7 +14,7 @@ fn cmp(left: isize, right: isize) -> isize {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct Triple {
     x: isize,
     y: isize,
@@ -50,7 +50,7 @@ impl Add for Triple {
 type P = Triple;
 type V = Triple;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct Moon {
     position: P,
     velocity: V,
@@ -89,22 +89,51 @@ impl Moon {
     }
 }
 
-fn total_energy(moons: &mut Vec<Moon>, iterations: usize) -> isize {
-    for _ in 0..iterations {
-        let gravities: Vec<V> = moons.iter().map(|m| m.gravity(&moons)).collect();
+struct Moons {
+    moons: Vec<Moon>
+}
 
-        for (m, g) in moons.iter_mut().zip(gravities) {
+impl Moons {
+    fn new(moons: Vec<Moon>) -> Self {
+        Moons {
+            moons: moons
+        }
+    }
+
+    fn step(&mut self) {
+        let gravities: Vec<V> = self.moons.iter().map(|m| m.gravity(&self.moons)).collect();
+
+        for (m, g) in self.moons.iter_mut().zip(gravities) {
             m.step(g);
         }
     }
-    moons.iter().map(|m| m.total_energy()).sum()
+
+    fn total_energy(&self) -> isize {
+        self.moons.iter().map(|m| m.total_energy()).sum()
+    }
+}
+
+impl fmt::Debug for Moons {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for m in &self.moons {
+            write!(f, "<x={}, y={}, z={}> ", m.position.x, m.position.y, m.position.z)?
+        };
+        Ok(())
+    }
+}
+
+fn total_energy(moons: &mut Moons, iterations: usize) -> isize {
+    for _ in 0..iterations {
+        moons.step();
+    }
+    moons.total_energy()
 }
 
 fn main() {
     let input = fs::read_to_string("/home/chris/advent_of_code/2019/inputs/day12.txt").unwrap();
 
     let re = Regex::new(r"<x=(\-?\d+), y=(\-?\d+), z=(\-?\d+)>").unwrap();
-    let mut moons: Vec<Moon> = re
+    let moons: Vec<Moon> = re
         .captures_iter(&input)
         .map(|c| {
             Moon::new(P {
@@ -114,7 +143,15 @@ fn main() {
             })
         })
         .collect();
+    let mut moons = Moons::new(moons);
 
-    let part1 = total_energy(&mut moons, 1000);
-    println!("{}", part1);
+    //let part1 = total_energy(&mut moons, 1000);
+    //println!("{}", part1);
+
+    loop {
+        moons.step();
+        let kinetic: isize = moons.moons.iter().map(|m| m.kinetic()).sum();
+        let potential: isize = moons.moons.iter().map(|m| m.potential()).sum();
+        println!("{} {}", kinetic, potential);
+    }
 }
