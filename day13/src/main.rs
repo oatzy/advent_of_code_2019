@@ -2,11 +2,9 @@ extern crate intcode;
 extern crate ncurses;
 
 use intcode::{Computer, Interupt, Program};
-//use ncurses;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
-use std::io;
 
 enum State {
     NewGame(Program),
@@ -41,8 +39,8 @@ impl Tile {
     fn to_string(&self) -> String {
         match self {
             Tile::Empty => " ".to_string(),
-            Tile::Wall => "█".to_string(),
-            Tile::Block => "#".to_string(),
+            Tile::Wall => "#".to_string(),
+            Tile::Block => "X".to_string(),
             Tile::Paddle => "=".to_string(),
             Tile::Ball => "o".to_string(),
             Tile::Score(s) => s.to_string(),
@@ -142,6 +140,8 @@ impl Game {
             ncurses::refresh();
         }
         ncurses::endwin();
+
+        println!("{}", self);
         println!("GAME OVER!");
     }
 }
@@ -160,11 +160,11 @@ impl fmt::Display for Game {
                 .unwrap()
         )?;
 
-        for y in 0..height {
+        for y in 0..=height {
             writeln!(
                 f,
                 "{}",
-                (0..width)
+                (0..=width)
                     .map(|x| self
                         .layout
                         .get(&P(x as isize, y as isize))
