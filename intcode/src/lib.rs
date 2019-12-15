@@ -42,6 +42,7 @@ enum Op {
     Halt,                    // 99
 }
 
+#[derive(Clone)]
 pub enum Interupt {
     Halt,
     Input(InputState),
@@ -247,6 +248,7 @@ impl From<String> for Program {
     }
 }
 
+#[derive(Clone)]
 pub struct InputState {
     program: Program,
     position: usize,
@@ -259,6 +261,7 @@ impl InputState {
     }
 }
 
+#[derive(Clone)]
 pub struct OutputState {
     program: Program,
     value: isize,

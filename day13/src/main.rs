@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 
+#[derive(Clone)]
 enum State {
     NewGame(Program),
     Continue(Interupt),
@@ -15,6 +16,7 @@ enum State {
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 struct P(isize, isize);
 
+#[derive(Clone)]
 enum Tile {
     Empty,
     Wall,
@@ -54,9 +56,12 @@ impl fmt::Display for Tile {
     }
 }
 
+type Layout = HashMap<P, Tile>;
+
 struct Game {
     program: State,
-    layout: HashMap<P, Tile>,
+    layout: Layout,
+    save_state: Option<(State, Layout)>,
 }
 
 impl Game {
@@ -64,7 +69,23 @@ impl Game {
         Game {
             program: State::NewGame(program),
             layout: HashMap::new(),
+            save_state: None,
         }
+    }
+
+    fn save(&mut self) {
+        self.save_state = Some((self.program.clone(), self.layout.clone()));
+    }
+
+    fn restore(&mut self) -> bool {
+        if self.save_state.is_some() {
+            let (program, layout) = self.save_state.take().unwrap();
+            self.program = program;
+            self.layout = layout;
+            self.save();
+            return true;
+        };
+        false
     }
 
     fn input(mut self, joystick: isize) -> Self {
@@ -119,11 +140,17 @@ impl Game {
         ncurses::noecho();
 
         //let mut buf = String::new();
-        loop {
+        for mut t in 0.. {
             ncurses::clear();
             self = self.refresh();
             if let State::GameOver = self.program {
-                break;
+                if !self.restore() {
+                    break;
+                }
+                t = 0;
+            }
+            if t % 50 == 0 {
+                self.save();
             }
             //println!("{}", self);
             ncurses::addstr(&format!("{}", self));
