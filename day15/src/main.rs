@@ -2,7 +2,7 @@ extern crate intcode;
 extern crate ncurses;
 
 use intcode::{Computer, Program};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs;
 
@@ -17,6 +17,15 @@ impl P {
             Move::East => P(self.0 + 1, self.1),
             Move::West => P(self.0 - 1, self.1),
         }
+    }
+
+    fn adjacent(&self) -> Vec<P> {
+        vec![
+            self.go(Move::North),
+            self.go(Move::South),
+            self.go(Move::East),
+            self.go(Move::West),
+        ]
     }
 }
 
@@ -166,10 +175,88 @@ fn run_interactive(area: &mut Area) {
     println!("{:?}", area.bot.position);
 }
 
-fn main() {
-    let input = fs::read_to_string("/home/chris/advent_of_code/2019/inputs/day15.txt").unwrap();
-    let program = Program::from(input);
-    let mut area = Area::new(Bot::new(Computer::new(program.clone())));
+struct FloodFill {
+    walls: HashSet<P>,
+    distances: HashMap<P, usize>,
+    queue: Vec<P>,
+}
 
-    run_interactive(&mut area);
+impl FloodFill {
+    fn fill(&mut self) {
+        while self.queue.len() > 0 {
+            let current = self.queue.remove(0);
+            // println!("{:?}", current);
+            // println!("{:?}", self.distances);
+            let adjacent = current.adjacent();
+            // println!("{:?}", adjacent);
+            let adjacent: Vec<P> = adjacent
+                .iter()
+                .filter(|x| !self.walls.contains(x))
+                .map(|&x| x)
+                .collect();
+            // println!("{:?}", adjacent);
+            let shortest = adjacent
+                .iter()
+                .filter(|x| self.distances.contains_key(x))
+                .map(|x| *self.distances.get(x).unwrap())
+                .min()
+                .unwrap();
+            self.distances.insert(current, shortest + 1);
+            let mut adjacent: Vec<P> = adjacent
+                .iter()
+                .filter(|x| !self.queue.contains(x) && !self.distances.contains_key(x))
+                .map(|&x| x)
+                .collect();
+            self.queue.append(&mut adjacent);
+        }
+    }
+}
+
+impl From<String> for FloodFill {
+    fn from(input: String) -> Self {
+        let mut start = P(0, 0);
+        let mut walls = HashSet::new();
+
+        for (y, line) in input.lines().enumerate() {
+            for (x, c) in line.chars().enumerate() {
+                let point = P(x as isize, y as isize);
+                match c {
+                    '#' => {
+                        walls.insert(point);
+                    }
+                    'X' => start = point,
+                    _ => (),
+                };
+            }
+        }
+
+        let mut distances = HashMap::new();
+        distances.insert(start, 0);
+        let queue: Vec<P> = start
+            .adjacent()
+            .iter()
+            .filter(|x| !walls.contains(x))
+            .map(|&x| x)
+            .collect();
+
+        FloodFill {
+            walls: walls,
+            distances: distances,
+            queue: queue,
+        }
+    }
+}
+
+fn main() {
+    // let input = fs::read_to_string("/home/chris/advent_of_code/2019/inputs/day15.txt").unwrap();
+    // let program = Program::from(input);
+    // let mut area = Area::new(Bot::new(Computer::new(program.clone())));
+
+    //run_interactive(&mut area);
+
+    let map = fs::read_to_string("/home/chris/advent_of_code/2019/day15/output.txt").unwrap();
+    let mut flood = FloodFill::from(map);
+    flood.fill();
+    let part2 = flood.distances.values().max().unwrap();
+    println!("{}", part2);
 }
