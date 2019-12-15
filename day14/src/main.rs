@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Reaction {
     inputs: HashMap<String, usize>,
     output: String,
@@ -13,7 +13,7 @@ impl Reaction {
         if self.amount >= amount {
             self.amount
         } else {
-            self.amount * (amount as f32 / self.amount as f32).ceil() as usize
+            self.amount * (amount as f64 / self.amount as f64).ceil() as usize
         }
     }
 
@@ -21,7 +21,7 @@ impl Reaction {
         if self.amount >= amount {
             self.inputs.clone()
         } else {
-            let multiplier = (amount as f32 / self.amount as f32).ceil() as usize;
+            let multiplier = (amount as f64 / self.amount as f64).ceil() as usize;
             let mut result = HashMap::new();
             for (input, amount) in self.inputs.iter() {
                 result.insert(input.clone(), multiplier * amount);
@@ -51,9 +51,20 @@ impl From<String> for Reaction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Reactions {
     outputs: HashMap<String, Reaction>,
+}
+
+impl Reactions {
+    fn set_fuel(&mut self, fuel: usize) {
+        let mut reaction = self.outputs.remove("FUEL").unwrap();
+        reaction.amount = fuel;
+        for (_, amount) in reaction.inputs.iter_mut() {
+            *amount *= fuel;
+        }
+        self.outputs.insert("FUEL".to_string(), reaction);
+    }
 }
 
 impl From<String> for Reactions {
@@ -75,7 +86,7 @@ fn fuel_requirements(reactions: &Reactions) -> usize {
 
     while required.len() != 0 {
         let mut updated = HashMap::new();
-
+        // println!("{:?}", required);
         for (item, &amount) in required.iter() {
             // println!("{}: {}", item, amount);
             // println!("{:?}", spares);
@@ -108,7 +119,7 @@ fn fuel_requirements(reactions: &Reactions) -> usize {
             } else {
                 let reaction = reactions.outputs.get(id).unwrap();
                 if count >= reaction.amount {
-                    let multiplier = (count as f32 / reaction.amount as f32).floor() as usize;
+                    let multiplier = (count as f64 / reaction.amount as f64).floor() as usize;
                     for (item, amount) in reaction.inputs.iter() {
                         *updated.entry(item.to_string()).or_insert(0) += amount * multiplier;
                     }
@@ -128,11 +139,33 @@ fn fuel_requirements(reactions: &Reactions) -> usize {
     ore
 }
 
+fn find_max(reactions: &Reactions) -> usize {
+    // result from part 1 = 504284
+    // so the correct answer is going to be in the region of 1e12/part1
+    // then I did manual interpolation to find the point
+    let mut fuel = 2690790;
+
+    loop {
+        let mut test_reactions = reactions.clone();
+        test_reactions.set_fuel(fuel);
+        let ore = fuel_requirements(&test_reactions);
+        println!("fuel = {}, ore = {}", fuel, ore);
+        if ore > 1000000000000 {
+            break;
+        }
+        fuel += 1;
+    }
+    fuel - 1
+}
+
 fn main() {
     let input = fs::read_to_string("/home/chris/advent_of_code/2019/inputs/day14.txt").unwrap();
     let reactions = Reactions::from(input);
-    let part1 = fuel_requirements(&reactions);
-    println!("{}", part1);
+    // let part1 = fuel_requirements(&reactions);
+    // println!("{}", part1);
+
+    let part2 = find_max(&reactions);
+    println!("{}", part2);
 }
 
 #[cfg(test)]
@@ -188,5 +221,28 @@ mod test {
         let reactions = Reactions::from(input);
         println!("{:?}", reactions);
         assert_eq!(fuel_requirements(&reactions), 13312);
+    }
+
+    #[test]
+    fn test_basic1_part2() {
+        use super::{fuel_requirements, Reactions};
+
+        let input = "157 ORE => 5 NZVS
+165 ORE => 6 DCFZ
+44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL
+12 HKGWZ, 1 GPVTF, 8 PSHF => 9 QDVJ
+179 ORE => 7 PSHF
+177 ORE => 5 HKGWZ
+7 DCFZ, 7 PSHF => 2 XJWVT
+165 ORE => 2 GPVTF
+3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT"
+            .to_string();
+        let mut reactions = Reactions::from(input);
+        let expect = 82892754;
+        reactions.set_fuel(expect);
+        println!("{:?}", reactions);
+        let requirements = fuel_requirements(&reactions);
+        println!("requirement = {}", requirements);
+        assert!(requirements < 1000000000000);
     }
 }
