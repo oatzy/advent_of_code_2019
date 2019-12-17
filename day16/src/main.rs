@@ -52,27 +52,42 @@ fn fft_phases(signal: &V, pattern: &V, loops: usize) -> V {
     output
 }
 
-fn fft_from(signal: &V, pattern: &V, start: usize) -> V {
-    (0..signal.len())
-        .map(|i| fft_digit_fn(&signal, i + start))
-        .collect()
-}
+fn part2(input: &String) -> V {
+    let start: usize = input[..7].parse().unwrap();
+    let target_length = 10_000 * input.trim().len();
 
-fn fft_phases_from(signal: &V, pattern: &V, loops: usize, start: usize) -> V {
-    println!("cloning input");
-    let mut output = signal.clone();
-    println!("looping");
-    for i in 0..loops {
-        output = fft_from(&output, &pattern, start);
-        println!("{}", i);
+    // println!("{} - {}", start, target_length);
+
+    let mut input: V = input
+        .trim()
+        .chars()
+        .map(|x| x.to_digit(10).unwrap() as isize)
+        .cycle()
+        .skip(start)
+        .take(target_length - start)
+        .collect();
+
+    for i in 0..100 {
+        println!("loop {}", i);
+
+        input.reverse();
+        let mut transformed: V = input
+            .iter()
+            .scan(0, |acc, &x| {
+                *acc = (*acc + x) % 10;
+                Some(*acc)
+            })
+            .collect();
+        transformed.reverse();
+        input = transformed;
     }
-    output
+    input
 }
 
 fn main() {
     let input = fs::read_to_string("/home/chris/advent_of_code/2019/inputs/day16.txt").unwrap();
 
-    let pattern = vec![0, 1, 0, -1];
+    // let pattern = vec![0, 1, 0, -1];
 
     // let input: V = input
     //     .trim()
@@ -90,23 +105,7 @@ fn main() {
 
     // println!("{}", part1);
 
-    let start: usize = input[..7].parse().unwrap();
-    let target_length = 10_000 * input.len();
-
-    println!("{} - {}", start, target_length);
-
-    println!("building input");
-    let input: V = input
-        .trim()
-        .chars()
-        .map(|x| x.to_digit(10).unwrap() as isize)
-        .cycle()
-        .skip(start)
-        .take(target_length - start)
-        .collect();
-
-    println!("performing transform");
-    let part2 = fft_phases_from(&input, &pattern, 100, start)
+    let part2 = part2(&input)
         .iter()
         .take(8)
         .map(|&x| x.to_string())
