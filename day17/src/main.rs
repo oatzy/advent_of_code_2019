@@ -25,6 +25,12 @@ enum Tile {
     Empty = 46,
 }
 
+enum Instruction {
+    TurnLeft,
+    TurnRight,
+    Forward(usize),
+}
+
 struct Image {
     layout: HashMap<P, Tile>,
     bot: P,
@@ -80,6 +86,22 @@ impl Image {
             .map(|x| x.0 * x.1)
             .sum()
     }
+
+    fn trace_path(&self) -> Vec<Instruction> {
+        unimplemented!()
+    }
+}
+
+fn compress(path: Vec<Instruction>) -> Vec<usize> {
+    // find repeated pattern return mapping + copressed
+    unimplemented!()
+}
+
+fn run(bot: &mut Computer, path: Vec<usize>) -> isize {
+    for i in path {
+        bot.input(i as isize).unwrap();
+    }
+    bot.output().unwrap()
 }
 
 impl fmt::Display for Image {
