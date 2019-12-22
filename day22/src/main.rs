@@ -1,6 +1,13 @@
 use std::fs;
 use std::iter;
 
+#[derive(Clone, Copy)]
+enum Shuffle {
+    IntoNewStack,
+    WithIncrement(usize),
+    Cut(isize),
+}
+
 struct Deck {
     cards: Vec<usize>,
 }
@@ -34,26 +41,67 @@ impl Deck {
             self.cards.rotate_right(size.abs() as usize)
         }
     }
+
+    fn shuffle(&mut self, steps: &Vec<Shuffle>) {
+        for step in steps {
+            match step {
+                Shuffle::IntoNewStack => self.deal_into_new_stack(),
+                Shuffle::Cut(size) => self.cut(*size),
+                Shuffle::WithIncrement(size) => self.deal_with_increment(*size),
+            }
+        }
+    }
+}
+
+fn position_after_shuffles(position: usize, card_count: usize, shuffle: &Vec<Shuffle>) -> usize {
+    let mut p = position;
+    for s in shuffle {
+        p = match s {
+            Shuffle::IntoNewStack => card_count - position - 1,
+            Shuffle::Cut(size) if *size < 0 => (position + size.abs() as usize) % card_count,
+            Shuffle::Cut(size) => (position + card_count - *size as usize) % card_count,
+            Shuffle::WithIncrement(size) => (position * size) % card_count,
+        }
+    }
+    p
 }
 
 fn main() {
     let input = fs::read_to_string("/home/chris/advent_of_code/2019/inputs/day22.txt").unwrap();
 
-    let mut deck = Deck::new(10007);
+    let steps: Vec<Shuffle> = input
+        .lines()
+        .map(|line| {
+            if line.contains("new") {
+                Shuffle::IntoNewStack
+            } else if line.contains("cut") {
+                Shuffle::Cut(line.split_whitespace().last().unwrap().parse().unwrap())
+            } else if line.contains("increment") {
+                Shuffle::WithIncrement(line.split_whitespace().last().unwrap().parse().unwrap())
+            } else {
+                panic!("unexpected line {}", line)
+            }
+        })
+        .collect();
 
-    for line in input.lines() {
-        if line.contains("new") {
-            deck.deal_into_new_stack();
-        } else if line.contains("cut") {
-            deck.cut(line.split_whitespace().last().unwrap().parse().unwrap());
-        } else if line.contains("increment") {
-            deck.deal_with_increment(line.split_whitespace().last().unwrap().parse().unwrap());
-        } else {
-            panic!("unexpected line {}", line)
-        }
-    }
+    // let mut deck = Deck::new(10007);
+    // deck.shuffle(&steps);
 
-    println!("{}", deck.cards.iter().position(|&x| x == 2019).unwrap());
+    // println!("{}", deck.cards.iter().position(|&x| x == 2019).unwrap());
+    println!("{}", position_after_shuffles(2019, 10007, &steps));
+
+    // let part2 = (0..119315717514047)
+    //     .map(|pos| {
+    //         let mut p = pos;
+    //         for _ in 0..101741582076661_u64 {
+    //             p = position_after_shuffles(p, 119315717514047, &steps);
+    //         }
+    //         p
+    //     })
+    //     .position(|x| x == 2020)
+    //     .unwrap();
+
+    //println!("{}", part2);
 }
 
 #[cfg(test)]
