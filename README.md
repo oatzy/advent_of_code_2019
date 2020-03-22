@@ -14,6 +14,8 @@ This is not as good as last year, when I had (I think) 45/50 by boxing day; but 
 
 I do intend to go back and finish off those remaining stars 'eventually'
 
+[UPDATE; 2020-03-22] - I probably won't
+
 As for Rust, I actually found it really pleasant to work with. Going into this advent, I expected it might take more effort than python (especially since I haven't used it much). But actually, I didn't find it to be that much harder than doing it in python.
 
 I think using VS Code with RLS was a big help in that regard. Seeing potential issues highlighted as you go is very useful. I think if I'd had to do 'write some code, compile, fix errors, repeat', I probably would have gotten frustrated very quickly.
