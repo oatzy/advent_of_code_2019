@@ -1,5 +1,5 @@
 extern crate intcode;
-extern crate ncurses;
+// extern crate ncurses;
 
 use intcode::{Computer, Interupt, Program};
 use std::collections::HashMap;
@@ -16,7 +16,7 @@ enum State {
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 struct P(isize, isize);
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum Tile {
     Empty,
     Wall,
@@ -61,7 +61,8 @@ type Layout = HashMap<P, Tile>;
 struct Game {
     program: State,
     layout: Layout,
-    save_state: Option<(State, Layout)>,
+    ballx: isize,
+    paddlex: isize,
 }
 
 impl Game {
@@ -69,23 +70,9 @@ impl Game {
         Game {
             program: State::NewGame(program),
             layout: HashMap::new(),
-            save_state: None,
+            ballx: 0,
+            paddlex: 0,
         }
-    }
-
-    fn save(&mut self) {
-        self.save_state = Some((self.program.clone(), self.layout.clone()));
-    }
-
-    fn restore(&mut self) -> bool {
-        if self.save_state.is_some() {
-            let (program, layout) = self.save_state.take().unwrap();
-            self.program = program;
-            self.layout = layout;
-            self.save();
-            return true;
-        };
-        false
     }
 
     fn input(mut self, joystick: isize) -> Self {
@@ -122,6 +109,12 @@ impl Game {
                         } else {
                             Tile::new(tile)
                         };
+                        if tile == Tile::Ball {
+                            self.ballx = pos.0;
+                        }
+                        if tile == Tile::Paddle {
+                            self.paddlex = pos.0;
+                        }
                         self.layout.insert(pos, tile);
                         outputs.clear();
                     }
@@ -133,44 +126,59 @@ impl Game {
         self
     }
 
-    fn run(mut self) {
-        ncurses::initscr();
-        ncurses::keypad(ncurses::stdscr(), true);
-        //ncurses::raw();
-        ncurses::noecho();
-
-        //let mut buf = String::new();
-        for mut t in 0.. {
-            ncurses::clear();
+    fn auto(mut self) -> usize {
+        loop {
             self = self.refresh();
             if let State::GameOver = self.program {
-                if !self.restore() {
-                    break;
-                }
-                t = 0;
+                break;
             }
-            if t % 50 == 0 {
-                self.save();
-            }
-            //println!("{}", self);
-            ncurses::addstr(&format!("{}", self));
-            //io::stdin().read_line(&mut buf).unwrap();
-            //self = self.input(buf.trim().parse().unwrap());
-            //buf.clear();
-            let input = match ncurses::getch() {
-                ncurses::constants::KEY_RIGHT => 1,
-                ncurses::constants::KEY_LEFT => -1,
-                10 => 0, // enter
-                _ => break,
+            let input = if self.ballx < self.paddlex {
+                -1
+            } else if self.ballx > self.paddlex {
+                1
+            } else {
+                0
             };
             self = self.input(input);
-            ncurses::refresh();
         }
-        ncurses::endwin();
-
-        println!("{}", self);
-        println!("GAME OVER!");
+        if let Some(Tile::Score(score)) = self.layout.get(&P(-1, 0)) {
+            return *score;
+        }
+        panic!("Score wasn't found");
     }
+
+    // fn run(mut self) {
+    //     ncurses::initscr();
+    //     ncurses::keypad(ncurses::stdscr(), true);
+    //     //ncurses::raw();
+    //     ncurses::noecho();
+
+    //     //let mut buf = String::new();
+    //     for mut t in 0.. {
+    //         ncurses::clear();
+    //         self = self.refresh();
+    //         if let State::GameOver = self.program {
+    //             break;
+    //         }
+    //         //println!("{}", self);
+    //         ncurses::addstr(&format!("{}", self));
+    //         //io::stdin().read_line(&mut buf).unwrap();
+    //         //self = self.input(buf.trim().parse().unwrap());
+    //         //buf.clear();
+    //         let input = match ncurses::getch() {
+    //             ncurses::constants::KEY_RIGHT => 1,
+    //             ncurses::constants::KEY_LEFT => -1,
+    //             10 => 0, // enter
+    //             _ => break,
+    //         };
+    //         self = self.input(input);
+    //         ncurses::refresh();
+    //     }
+    //     ncurses::endwin();
+
+    //     println!("{}", self);
+    //     println!("GAME OVER!");
+    // }
 }
 
 impl fmt::Display for Game {
@@ -206,7 +214,7 @@ impl fmt::Display for Game {
 }
 
 fn main() {
-    let input = fs::read_to_string("/home/chris/advent_of_code/2019/inputs/day13.txt").unwrap();
+    let input = fs::read_to_string("../inputs/day13.txt").unwrap();
     let mut program = Program::from(input);
     // let computer = Computer::new(program.clone());
 
@@ -215,5 +223,7 @@ fn main() {
 
     program.set(0, 2);
     let game = Game::new(program);
-    game.run();
+    //game.run();
+    let score = game.auto();
+    println!("{}", score);
 }

@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 intcode = {"path" = "../intcode", version = "0.1.0" }
-ncurses = "5.99.0"
+# ncurses = "5.99.0"
